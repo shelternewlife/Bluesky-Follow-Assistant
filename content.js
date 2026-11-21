@@ -2,36 +2,29 @@
   if (window.__blueskyFollowAssistantLoaded) return;
   window.__blueskyFollowAssistantLoaded = true;
 
-  const clean = value => (value || "").replace(/\\s+/g, " ").trim();
+  const clean = value => (value || "").replace(/\s+/g, " ").trim();
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-  const isProfilePath = href => {
-    try {
-      const url = new URL(href, location.origin);
-      return url.origin === location.origin && /^\\/profile\\/[^/]+\\/?$/.test(url.pathname);
-    } catch { return false; }
-  };
+  const controlsSelector = 'button,[role="button"],[data-testid*="follow"]';
 
   function handleFromAnchor(anchor) {
     try {
-      return decodeURIComponent(new URL(anchor.href, location.origin).pathname.split("/")[2] || "").replace(/^@/, "");
+      const path = new URL(anchor.href, location.origin).pathname;
+      return decodeURIComponent(path.split("/")[2] || "").replace(/^@/, "");
     } catch { return ""; }
   }
 
-  function actionLabel(element) {
-    return clean(
-      element.getAttribute("aria-label") ||
-      element.getAttribute("title") ||
-      element.getAttribute("data-testid") ||
-      element.innerText ||
-      element.textContent
-    ).toLowerCase().replace(/[^a-z]/g, "");
-  }
-
   function actionState(element) {
-    const label = actionLabel(element);
-    if (label === "follow" || label === "followbtn") return "follow";
-    if (label === "following" || label === "unfollow" || label === "followingbtn") return "followed";
-    if (label === "requested" || label === "requesteds" || label === "pending") return "requested";
+    const label = clean([
+      element.getAttribute("aria-label"),
+      element.getAttribute("title"),
+      element.getAttribute("data-testid"),
+      element.innerText,
+      element.textContent
+    ].filter(Boolean).join(" ")).toLowerCase().replace(/[^a-z]/g, "");
+
+    if (label.includes("following") || label.includes("unfollow")) return "followed";
+    if (label.includes("requested") || label.includes("pending")) return "requested";
+    if (label.includes("follow")) return "follow";
     return "";
   }
 
@@ -41,7 +34,7 @@
       node = node.parentElement;
       const text = clean(node.innerText);
       if (!text || text.length > 2200) continue;
-      const controls = [...node.querySelectorAll('button,[role="button"]')];
+      const controls = [...node.querySelectorAll(controlsSelector)];
       if (controls.some(control => actionState(control))) return node;
     }
     return anchor.parentElement || anchor;
@@ -52,7 +45,7 @@
       .find(item => handleFromAnchor(item).toLowerCase() === handle.toLowerCase());
     if (!anchor) return null;
     const card = profileCard(anchor);
-    const controls = [...card.querySelectorAll('button,[role="button"]')];
+    const controls = [...card.querySelectorAll(controlsSelector)];
     const control = controls.find(item => actionState(item) === "follow");
     return { anchor, card, control };
   }
@@ -60,14 +53,14 @@
   function collectVisibleAccounts() {
     const found = new Map();
     for (const anchor of document.querySelectorAll('a[href*="/profile/"]')) {
-      const href = anchor.getAttribute("href");
-      if (!href || !isProfilePath(href)) continue;
       const handle = handleFromAnchor(anchor);
       if (!handle) continue;
       const card = profileCard(anchor);
-      const lines = (card.innerText || "").split(/\\n+/).map(clean).filter(Boolean);
+      const lines = (card.innerText || "").split(/\n+/).map(clean).filter(Boolean);
       const ignored = /^(follow|following|requested|unfollow|s'abonner|abonné|abonner|suivi)$/i;
-      const displayName = lines.find(line => line !== handle && !ignored.test(line) && !/^@?\\S+\\.bsky\\.social$/i.test(line)) || handle;
+      const displayName = lines.find(line =>
+        line !== handle && !ignored.test(line) && !/^@?\S+\.bsky\.social$/i.test(line)
+      ) || handle;
       if (!found.has(handle.toLowerCase())) {
         found.set(handle.toLowerCase(), {
           handle,
@@ -96,15 +89,18 @@
         await wait(400);
         const updated = findAccount(account.handle);
         const controls = updated?.card
-          ? [...updated.card.querySelectorAll('button,[role="button"]')]
+          ? [...updated.card.querySelectorAll(controlsSelector)]
           : [];
-        state = controls.map(actionState).find(value => value === "followed" || value === "requested") || "";
+        state = controls.map(actionState).find(value =>
+          value === "followed" || value === "requested"
+        ) || "";
         if (state) break;
       }
 
       attempted.push({
         handle: account.handle,
-        status: state === "followed" ? "followed" : state === "requested" ? "requested" : "unconfirmed"
+        status: state === "followed" ? "followed" :
+          state === "requested" ? "requested" : "unconfirmed"
       });
       if (!state) break;
       await wait(350);
