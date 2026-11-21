@@ -64,7 +64,7 @@ $("collect").addEventListener("click", async () => {
     const tab = await activeBlueskyTab();
     if (!tab) return;
     const response = await chrome.tabs.sendMessage(tab.id, {type:"BFA_COLLECT_VISIBLE"});
-    if (!response?.ok) throw new Error("Collection failed");
+    if (!response?.ok) throw new Error(response?.error || "Collection failed");
     const diagnostics = response.diagnostics || {};
     const byHandle = new Map(accounts.map(account => [account.handle.toLowerCase(), account]));
     for (const account of response.accounts) {
@@ -77,16 +77,26 @@ $("collect").addEventListener("click", async () => {
     accounts = [...byHandle.values()];
     await saveAccounts();
     const count = Array.isArray(response.accounts) ? response.accounts.length : 0;
-    const hrefSamples = (diagnostics.profileHrefSamples || []).slice(0, 3).join(" | ");
-    $("status").textContent = count
-      ? "Collected " + count + " visible account(s)."
-      : "0 accounts extracted. Page: " + (response.page || tab.url) +
-        " · profile links found: " + (diagnostics.profileLinksFound ?? "unknown") +
-        " · followers screen: " + (diagnostics.followerScreen ? "yes" : "no") +
-        (hrefSamples ? " · link samples: " + hrefSamples : " · no profile href samples") +
-        " · title: " + (diagnostics.pageTitle || document.title || "unknown");
+    const hrefSamples = (diagnostics.profileHrefSamples || []).slice(0, 4).join(" | ");
+    const btnSamples = (diagnostics.buttonLabelSamples || []).slice(0, 3).join(" · ");
+    if (count) {
+      $("status").textContent = "Collected " + count + " visible account(s).";
+    } else {
+      $("status").textContent =
+        "0 accounts extracted. " +
+        "links=" + (diagnostics.profileLinksFound ?? "?") +
+        " · screen=" + (diagnostics.followerScreen ? "followers" : diagnostics.followingScreen ? "following" : "other") +
+        (hrefSamples ? " · hrefs: " + hrefSamples : " · no profile hrefs") +
+        (btnSamples ? " · buttons: " + btnSamples : "") +
+        " · " + (response.page || tab.url || "");
+    }
   } catch (error) {
-    $("status").textContent = "Collection error: " + (error?.message || String(error));
+    const msg = error?.message || String(error);
+    $("status").textContent =
+      "Collection error: " + msg +
+      (msg.includes("Could not establish connection") || msg.includes("Receiving end does not exist")
+        ? " → Reload the Bluesky tab (F5) after loading/updating the extension."
+        : "");
   }
 });
 $("autoFollow").addEventListener("click", async () => {
@@ -97,7 +107,7 @@ $("autoFollow").addEventListener("click", async () => {
     const tab = await activeBlueskyTab();
     if (!tab) return;
     const response = await chrome.tabs.sendMessage(tab.id, {type:"BFA_AUTO_FOLLOW_FIVE"});
-    if (!response?.ok) throw new Error("Follow action failed");
+    if (!response?.ok) throw new Error(response?.error || "Follow action failed");
     const byHandle = new Map(accounts.map(account => [account.handle.toLowerCase(), account]));
     for (const result of response.results) {
       const key = result.handle.toLowerCase();
