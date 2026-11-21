@@ -1,12 +1,22 @@
 {
   "manifest_version": 3,
   "name": "Bluesky Follow Assistant",
-  "version": "1.3.0",
-  "description": "Collect visible Bluesky accounts and show follow status for up to five automatic follows per run.",
+  "version": "2.0.0",
+  "description": "Collect accounts from Bluesky followers/following pages (API + DOM) and auto-follow up to 5 per run.",
   "permissions": ["storage", "tabs"],
-  "host_permissions": ["https://bsky.app/*"],
-  "action": { "default_title": "Bluesky Follow Assistant", "default_popup": "popup.html" },
+  "host_permissions": [
+    "https://bsky.app/*",
+    "https://public.api.bsky.app/*"
+  ],
+  "action": {
+    "default_title": "Bluesky Follow Assistant",
+    "default_popup": "popup.html"
+  },
   "content_scripts": [
-    { "matches": ["https://bsky.app/*"], "js": ["content.js"], "run_at": "document_idle" }
+    {
+      "matches": ["https://bsky.app/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
   ]
 }
