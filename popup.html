@@ -1,34 +1,42 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Bluesky Follow Assistant</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <header>
-    <div class="brand-mark">🦋</div>
-    <div><h1>Bluesky Follow Assistant</h1><p>Automatic follow · maximum 5 per run</p></div>
+    <h1>🦋 Bluesky Follow Assistant</h1>
+    <p class="sub">Max 5 automatic follows per run</p>
   </header>
-  <section class="toolbar">
-    <button id="collect" class="secondary">Collect visible accounts</button>
-    <button id="autoFollow" class="primary">Start automatic follow (up to 5)</button>
-    <p class="hint">The extension checks profiles visible on the open Bluesky page. It does not open profile tabs.</p>
-    <div id="status" role="status" aria-live="polite">Ready.</div>
-  </section>
-  <section class="summary"><strong id="count">0</strong><span>accounts in the list</span></section>
-  <section class="controls">
-    <input id="search" type="search" placeholder="Search accounts…" aria-label="Search accounts">
-    <button id="clearList" class="text-button">Clear list</button>
-  </section>
-  <main id="accounts" aria-live="polite"><div class="empty">No accounts collected yet.</div></main>
+
+  <div class="actions">
+    <button id="btnCollect" class="btn secondary">Collect accounts</button>
+    <button id="btnFollow" class="btn primary">Start automatic follow (up to 5)</button>
+  </div>
+
+  <div id="status" class="status">Ready.</div>
+
+  <div class="summary">
+    <strong id="count">0</strong> accounts in list
+  </div>
+
+  <div class="toolbar">
+    <input id="search" type="search" placeholder="Search…">
+    <button id="btnClear" class="btn text">Clear list</button>
+  </div>
+
+  <main id="list"></main>
+
   <footer>
-    <span class="legend"><i class="dot followed"></i> Followed</span>
-    <span class="legend"><i class="dot requested"></i> Request sent</span>
-    <span class="legend"><i class="dot new"></i> Not followed yet</span>
-    <span class="legend"><i class="dot failed"></i> Not confirmed</span>
+    <span><i class="dot followed"></i> Followed</span>
+    <span><i class="dot requested"></i> Requested</span>
+    <span><i class="dot new"></i> Not followed</span>
+    <span><i class="dot unconfirmed"></i> Unconfirmed</span>
   </footer>
+
   <script src="popup.js"></script>
 </body>
 </html>
