@@ -104,19 +104,38 @@ function pageCollect() {
 
   return (async () => {
     try {
-      const url =
-        "https://public.api.bsky.app/xrpc/" +
-        endpoint +
-        "?actor=" +
-        encodeURIComponent(actor) +
-        "&limit=50";
+      const allItems = [];
+      let cursor = undefined;
+      const pageSize = 100;
+      const hardCap = 5000;
+      let pages = 0;
 
-      const res = await fetch(url, { headers: { Accept: "application/json" } });
-      if (!res.ok) {
-        return { ok: false, error: "API error " + res.status };
+      while (allItems.length < hardCap) {
+        let url =
+          "https://public.api.bsky.app/xrpc/" +
+          endpoint +
+          "?actor=" +
+          encodeURIComponent(actor) +
+          "&limit=" +
+          pageSize;
+        if (cursor) url += "&cursor=" + encodeURIComponent(cursor);
+
+        const res = await fetch(url, { headers: { Accept: "application/json" } });
+        if (!res.ok) {
+          if (allItems.length === 0) {
+            return { ok: false, error: "API error " + res.status };
+          }
+          break;
+        }
+        const data = await res.json();
+        const items = data[listKey] || [];
+        pages++;
+        if (!items.length) break;
+        allItems.push(...items);
+        cursor = data.cursor;
+        if (!cursor) break;
+        await new Promise(r => setTimeout(r, 120));
       }
-      const data = await res.json();
-      const items = data[listKey] || [];
 
       function norm(t) {
         return (t || "")
@@ -131,7 +150,6 @@ function pageCollect() {
             " " +
             (btn.innerText || "")
         );
-        // Check "can follow" FIRST — "S'abonner" contains substring "abonne"
         if (/(^|[^a-z])(s'abonner|sabonner|suivre|follow back|followback|\bfollow\b)([^a-z]|$)/.test(label)) return "follow";
         if (/(^|[^a-z])(requested|pending|demande|en attente|awaiting)([^a-z]|$)/.test(label)) return "requested";
         if (/(^|[^a-z])(following|unfollow|\babonne\b|abonnee|\bsuivi\b|suivie)([^a-z]|$)/.test(label)) return "followed";
@@ -160,25 +178,30 @@ function pageCollect() {
         } catch (_) {}
       });
 
-      const accounts = items.map(p => {
+      const seen = new Map();
+      for (const p of allItems) {
         const handle = p.handle || p.did;
         const key = handle.toLowerCase();
-        return {
+        if (seen.has(key)) continue;
+        seen.set(key, {
           handle,
           did: p.did || "",
           displayName: p.displayName || handle,
           avatar: p.avatar || "",
           url: "https://bsky.app/profile/" + encodeURIComponent(handle),
           status: stateMap.get(key) || stateMap.get((p.did || "").toLowerCase()) || "new"
-        };
-      });
+        });
+      }
+      const accounts = Array.from(seen.values());
 
       return {
         ok: true,
         accounts,
         actor,
         source: "api",
-        count: accounts.length
+        count: accounts.length,
+        pages,
+        truncated: !!cursor && allItems.length >= hardCap
       };
     } catch (e) {
       return { ok: false, error: String(e.message || e) };
@@ -198,7 +221,6 @@ function pageAutoFollow(handles) {
     const label = norm(
       (btn.getAttribute("aria-label") || "") + " " + (btn.innerText || "")
     );
-    // Check "can follow" FIRST — "S'abonner" contains substring "abonne"
     if (/(^|[^a-z])(s'abonner|sabonner|suivre|follow back|followback|\bfollow\b)([^a-z]|$)/.test(label)) return "follow";
     if (/(^|[^a-z])(requested|pending|demande|en attente|awaiting)([^a-z]|$)/.test(label)) return "requested";
     if (/(^|[^a-z])(following|unfollow|\babonne\b|abonnee|\bsuivi\b|suivie)([^a-z]|$)/.test(label)) return "followed";
@@ -250,39 +272,87 @@ function pageAutoFollow(handles) {
     return "";
   }
 
+  function scrollListDown() {
+    const candidates = [
+      document.querySelector('[data-testid="profileFollowersScreen"]'),
+      document.querySelector('[data-testid="profileFollowsScreen"]'),
+      document.querySelector('main'),
+      document.scrollingElement
+    ].filter(Boolean);
+    for (const el of candidates) {
+      try {
+        el.scrollBy(0, Math.min(900, el.clientHeight || 600));
+      } catch (_) {}
+    }
+    window.scrollBy(0, 800);
+  }
+
   return (async () => {
     const results = [];
-    for (const handle of handles) {
-      if (results.length >= 50) break;
-      const btn = findFollowButton(handle);
-      if (!btn) continue;
+    const pending = handles.slice();
+    let idleRounds = 0;
 
-      try {
-        btn.click();
-      } catch (e) {
-        results.push({ handle, status: "unconfirmed" });
-        break;
+    while (pending.length && results.length < 10000) {
+      let progressed = false;
+
+      for (let i = 0; i < pending.length; ) {
+        const handle = pending[i];
+        const btn = findFollowButton(handle);
+        if (!btn) {
+          i++;
+          continue;
+        }
+
+        try {
+          btn.click();
+        } catch (e) {
+          results.push({ handle, status: "unconfirmed" });
+          pending.splice(i, 1);
+          progressed = true;
+          await new Promise(r => setTimeout(r, 400));
+          continue;
+        }
+
+        let status = "";
+        const deadline = Date.now() + 7000;
+        while (Date.now() < deadline) {
+          await new Promise(r => setTimeout(r, 350));
+          status = currentState(handle);
+          if (status === "followed" || status === "requested") break;
+          if (!findFollowButton(handle)) {
+            status = "followed";
+            break;
+          }
+        }
+        results.push({ handle, status: status || "unconfirmed" });
+        pending.splice(i, 1);
+        progressed = true;
+        await new Promise(r => setTimeout(r, 450));
       }
 
-      let status = "";
-      const deadline = Date.now() + 8000;
-      while (Date.now() < deadline) {
-        await new Promise(r => setTimeout(r, 400));
-        status = currentState(handle);
-        if (status === "followed" || status === "requested") break;
-        if (!findFollowButton(handle)) {
-          status = "followed";
+      if (!pending.length) break;
+
+      if (!progressed) {
+        idleRounds++;
+        scrollListDown();
+        await new Promise(r => setTimeout(r, 900));
+        if (idleRounds >= 8) {
+          for (const h of pending) {
+            results.push({ handle: h, status: "unconfirmed" });
+          }
+          pending.length = 0;
           break;
         }
+      } else {
+        idleRounds = 0;
       }
-      results.push({ handle, status: status || "unconfirmed" });
-      if (!status) break;
-      await new Promise(r => setTimeout(r, 500));
     }
+
     return {
       ok: true,
       results,
-      followed: results.filter(r => r.status === "followed").length
+      followed: results.filter(r => r.status === "followed").length,
+      remainingNotInDom: pending.length
     };
   })();
 }
@@ -312,8 +382,11 @@ $("btnCollect").addEventListener("click", async () => {
     accounts = [...map.values()];
     await save();
 
+    const extra = result.truncated
+      ? " (stopped at safety cap)"
+      : (result.pages ? " (" + result.pages + " API page(s))" : "");
     setStatus(
-      "Collected " + result.count + " account(s) via API for @" + result.actor
+      "Collected " + result.count + " account(s) via API for @" + result.actor + extra
     );
   } catch (e) {
     const msg = e.message || String(e);
@@ -328,14 +401,13 @@ $("btnCollect").addEventListener("click", async () => {
 $("btnFollow").addEventListener("click", async () => {
   const btn = $("btnFollow");
   btn.disabled = true;
-  setStatus("Following up to 50…");
+  setStatus("Following all eligible accounts…");
   try {
     const tab = await getBlueskyTab();
     if (!tab) return;
 
     const candidates = accounts
       .filter(a => a.status === "new")
-      .slice(0, 50)
       .map(a => a.handle);
 
     if (!candidates.length) {
@@ -365,7 +437,7 @@ $("btnFollow").addEventListener("click", async () => {
     setStatus(
       followed + " followed" +
       (requested ? ", " + requested + " requested" : "") +
-      (unconf ? ", " + unconf + " unconfirmed (stopped)" : "") +
+      (unconf ? ", " + unconf + " unconfirmed" : "") +
       "."
     );
   } catch (e) {
