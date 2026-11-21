@@ -65,6 +65,7 @@ $("collect").addEventListener("click", async () => {
     if (!tab) return;
     const response = await chrome.tabs.sendMessage(tab.id, {type:"BFA_COLLECT_VISIBLE"});
     if (!response?.ok) throw new Error("Collection failed");
+    const diagnostics = response.diagnostics || {};
     const byHandle = new Map(accounts.map(account => [account.handle.toLowerCase(), account]));
     for (const account of response.accounts) {
       const previous = byHandle.get(account.handle.toLowerCase());
@@ -75,9 +76,17 @@ $("collect").addEventListener("click", async () => {
     }
     accounts = [...byHandle.values()];
     await saveAccounts();
-    $("status").textContent = "Collected " + response.accounts.length + " visible account(s).";
-  } catch {
-    $("status").textContent = "Could not collect accounts. Refresh the Bluesky page and try again.";
+    const count = Array.isArray(response.accounts) ? response.accounts.length : 0;
+    const hrefSamples = (diagnostics.profileHrefSamples || []).slice(0, 3).join(" | ");
+    $("status").textContent = count
+      ? "Collected " + count + " visible account(s)."
+      : "0 accounts extracted. Page: " + (response.page || tab.url) +
+        " · profile links found: " + (diagnostics.profileLinksFound ?? "unknown") +
+        " · followers screen: " + (diagnostics.followerScreen ? "yes" : "no") +
+        (hrefSamples ? " · link samples: " + hrefSamples : " · no profile href samples") +
+        " · title: " + (diagnostics.pageTitle || document.title || "unknown");
+  } catch (error) {
+    $("status").textContent = "Collection error: " + (error?.message || String(error));
   }
 });
 $("autoFollow").addEventListener("click", async () => {
