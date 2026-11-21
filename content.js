@@ -2,9 +2,9 @@
   if (window.__blueskyFollowAssistantLoaded) return;
   window.__blueskyFollowAssistantLoaded = true;
 
-  const clean = value => (value || "").replace(/\\s+/g, " ").trim();
+  const clean = value => (value || "").replace(/\s+/g, " ").trim();
   const normalize = value => clean(value).toLowerCase()
-    .normalize("NFD").replace(/[\\u0300-\\u036f]/g, "")
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "")
     .replace(/[’‘]/g, "'").replace(/[^a-z']/g, "");
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
   const controlsSelector = 'button,[role="button"],[data-testid*="follow" i]';
@@ -13,7 +13,7 @@
   function handleFromAnchor(anchor) {
     try {
       const url = new URL(anchor.getAttribute("href") || anchor.href, location.origin);
-      const match = url.pathname.match(/^\\/profile\\/([^/]+)(?:\\/)?$/i);
+      const match = url.pathname.match(/^\/profile\/([^/]+)(?:\/)?$/i);
       return match ? decodeURIComponent(match[1]).replace(/^@/, "") : "";
     } catch { return ""; }
   }
@@ -52,11 +52,11 @@
     const handle = handleFromAnchor(anchor);
     if (!handle) return null;
     const card = profileCard(anchor);
-    const lines = (card.innerText || "").split(/\\n+/).map(clean).filter(Boolean);
+    const lines = (card.innerText || "").split(/\n+/).map(clean).filter(Boolean);
     const ignored = /^(follow|following|requested|unfollow|s'abonner|sabonner|abonne[e]?|suivre|suivi[e]?|demande)$/i;
     const displayName = lines.find(line =>
       line !== handle && !ignored.test(normalize(line)) &&
-      !/^@?\\S+\\.bsky\\.social$/i.test(line)
+      !/^@?\S+\.bsky\.social$/i.test(line)
     ) || handle;
     const controls = [...card.querySelectorAll(controlsSelector)];
     const states = controls.map(actionState);
