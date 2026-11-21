@@ -292,7 +292,7 @@ function pageAutoFollow(handles) {
     const pending = handles.slice();
     let idleRounds = 0;
 
-    while (pending.length && results.length < 10000) {
+    while (pending.length && results.length < 100) {
       let progressed = false;
 
       for (let i = 0; i < pending.length; ) {
@@ -401,13 +401,14 @@ $("btnCollect").addEventListener("click", async () => {
 $("btnFollow").addEventListener("click", async () => {
   const btn = $("btnFollow");
   btn.disabled = true;
-  setStatus("Following all eligible accounts…");
+  setStatus("Following up to 100 eligible accounts…");
   try {
     const tab = await getBlueskyTab();
     if (!tab) return;
 
     const candidates = accounts
       .filter(a => a.status === "new")
+      .slice(0, 100)
       .map(a => a.handle);
 
     if (!candidates.length) {
