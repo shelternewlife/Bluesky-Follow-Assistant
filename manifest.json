@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "Bluesky Follow Assistant",
-  "version": "3.0.0",
-  "description": "Collect accounts from Bluesky followers/following pages and auto-follow up to 5 per run.",
+  "version": "3.1.0",
+  "description": "Collect accounts from Bluesky followers/following pages and auto-follow up to 50 per run.",
   "permissions": ["storage", "activeTab", "scripting"],
   "host_permissions": [
     "https://bsky.app/*",
