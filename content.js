@@ -141,8 +141,13 @@
         page: location.href,
         diagnostics: {
           profileLinksFound: document.querySelectorAll(profileLinksSelector).length,
+          profileHrefSamples: [...document.querySelectorAll('a[href]')]
+            .map(anchor => anchor.getAttribute("href") || "")
+            .filter(href => href.toLowerCase().includes("profile"))
+            .slice(0, 8),
           followerScreen: Boolean(document.querySelector('[data-testid*="profileFollowersScreen"]')),
-          followingScreen: Boolean(document.querySelector('[data-testid*="profileFollowsScreen"]'))
+          followingScreen: Boolean(document.querySelector('[data-testid*="profileFollowsScreen"]')),
+          pageTitle: document.title
         }
       });
       return false;
