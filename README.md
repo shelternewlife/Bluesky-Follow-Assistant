@@ -1,38 +1,29 @@
 # Bluesky Follow Assistant
 
-A lightweight Chrome extension for collecting **currently visible** profile cards from a Bluesky followers page, saving them locally, reviewing them, and opening selected profiles for manual decisions.
+Chrome Manifest V3 extension that collects visible Bluesky profile cards and can follow up to five eligible accounts per button-initiated run.
 
-## Features
-
-- Collect profile links visible in the current Bluesky page section.
-- Scroll the followers page and collect again to build a larger list.
-- Deduplicate accounts by handle.
-- Search, select, open, and remove saved accounts.
-- Store data only in `chrome.storage.local` in this browser.
-- No Bluesky password, app password, API token, remote server, or external database.
-
-## Install in Chrome
+## Use
 
 1. Open `chrome://extensions`.
-2. Enable **Developer mode**.
-3. Choose **Load unpacked**.
-4. Select the folder containing `manifest.json`.
-5. Open a Bluesky followers page and refresh it.
-6. Open the extension, click **Collect visible accounts**, scroll the page, and repeat.
+2. Enable Developer mode.
+3. Click **Reload** for this extension (or remove the old unpacked copy and load the updated repository folder).
+4. Refresh the Bluesky page containing the profile list.
+5. Open the extension popup.
+6. Click **Collect visible accounts** to display the visible profiles.
+7. Click **Start automatic follow (up to 5)** to follow eligible profiles in the current page DOM.
 
-## Important behavior
+The popup does not open profile tabs and has no manual per-profile follow controls. A green dot means the page changed to a recognized Following/Unfollow state. Amber means Bluesky displayed a pending follow request. Red means the extension could not confirm the action. Gray means no follow was confirmed for that account.
 
-The extension only collects profile cards that are present in the page DOM at the moment you click the button. Bluesky loads long lists dynamically, so scroll down in sections and collect each section. The extension does not automatically follow, like, message, or otherwise interact with accounts. It opens selected profile pages in background tabs so you can review each one and decide manually.
+## Limits and behavior
 
-## Privacy
+- At most five follow clicks per run.
+- Only visible profile cards with an enabled Follow control are eligible.
+- Existing follows and pending requests are skipped.
+- If a click cannot be confirmed within ten seconds, the run stops.
+- The action starts only when the user presses the automatic-follow button.
+- Scroll the Bluesky list to load more accounts, then collect or run again.
+- The extension does not bypass challenges or platform controls.
 
-Collected account handles, display names, descriptions, and avatar URLs are saved in Chrome local extension storage. They are not sent to a server. Removing the extension or clearing its local storage may remove this data.
+## Privacy and permissions
 
-## Permissions
-
-- `storage`: save the review list locally.
-- Host access to `https://bsky.app/*`: read visible profile cards on Bluesky pages.
-
-## Development
-
-Manifest V3. No build step or external dependencies are required.
+Collected account details are stored in `chrome.storage.local` on this browser. The extension requests `storage` and `tabs` permissions and access to `https://bsky.app/*`. It does not request Bluesky credentials or send the collected list to a server.

@@ -6,12 +6,10 @@ async function loadAccounts() {
   accounts = Array.isArray(stored.accounts) ? stored.accounts : [];
   render();
 }
-
 async function saveAccounts() {
   await chrome.storage.local.set({ accounts });
   render();
 }
-
 function render() {
   const query = $("search").value.trim().toLowerCase();
   const visible = accounts.filter(account =>
@@ -20,14 +18,12 @@ function render() {
   );
   $("count").textContent = String(accounts.length);
   $("accounts").replaceChildren();
-
   if (!visible.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
     empty.textContent = accounts.length ? "No matching accounts." : "No accounts collected yet.";
     $("accounts").append(empty);
   }
-
   for (const account of visible) {
     const row = document.createElement("div");
     row.className = "account";
@@ -36,7 +32,6 @@ function render() {
     avatar.alt = "";
     avatar.src = account.avatar || "";
     avatar.onerror = () => { avatar.style.visibility = "hidden"; };
-
     const details = document.createElement("div");
     details.className = "details";
     const name = document.createElement("div");
@@ -46,22 +41,15 @@ function render() {
     handle.className = "handle";
     handle.textContent = "@" + account.handle;
     details.append(name, handle);
-
     const status = document.createElement("span");
     const state = ["followed", "requested", "unconfirmed"].includes(account.status) ? account.status : "new";
     status.className = "dot " + state;
-    status.title = ({
-      followed: "Follow confirmed",
-      requested: "Follow request sent",
-      unconfirmed: "Follow not confirmed",
-      new: "Not followed yet"
-    })[state];
+    status.title = ({followed:"Follow confirmed",requested:"Follow request sent",unconfirmed:"Follow not confirmed",new:"Not followed yet"})[state];
     status.setAttribute("aria-label", status.title);
     row.append(avatar, details, status);
     $("accounts").append(row);
   }
 }
-
 async function activeBlueskyTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id || !tab.url?.startsWith("https://bsky.app/")) {
@@ -70,21 +58,19 @@ async function activeBlueskyTab() {
   }
   return tab;
 }
-
 $("collect").addEventListener("click", async () => {
   $("status").textContent = "Collecting visible accounts…";
   try {
     const tab = await activeBlueskyTab();
     if (!tab) return;
-    const response = await chrome.tabs.sendMessage(tab.id, { type: "BFA_COLLECT_VISIBLE" });
+    const response = await chrome.tabs.sendMessage(tab.id, {type:"BFA_COLLECT_VISIBLE"});
     if (!response?.ok) throw new Error("Collection failed");
     const byHandle = new Map(accounts.map(account => [account.handle.toLowerCase(), account]));
     for (const account of response.accounts) {
       const previous = byHandle.get(account.handle.toLowerCase());
       byHandle.set(account.handle.toLowerCase(), {
-        ...previous,
-        ...account,
-        status: previous?.status || account.status || "new"
+        ...previous, ...account,
+        status: account.status !== "new" ? account.status : previous?.status || "new"
       });
     }
     accounts = [...byHandle.values()];
@@ -94,7 +80,6 @@ $("collect").addEventListener("click", async () => {
     $("status").textContent = "Could not collect accounts. Refresh the Bluesky page and try again.";
   }
 });
-
 $("autoFollow").addEventListener("click", async () => {
   const button = $("autoFollow");
   button.disabled = true;
@@ -102,17 +87,13 @@ $("autoFollow").addEventListener("click", async () => {
   try {
     const tab = await activeBlueskyTab();
     if (!tab) return;
-    const response = await chrome.tabs.sendMessage(tab.id, { type: "BFA_AUTO_FOLLOW_FIVE" });
+    const response = await chrome.tabs.sendMessage(tab.id, {type:"BFA_AUTO_FOLLOW_FIVE"});
     if (!response?.ok) throw new Error("Follow action failed");
     const byHandle = new Map(accounts.map(account => [account.handle.toLowerCase(), account]));
     for (const result of response.results) {
       const key = result.handle.toLowerCase();
-      const existing = byHandle.get(key) || {
-        handle: result.handle,
-        displayName: result.handle,
-        url: "https://bsky.app/profile/" + encodeURIComponent(result.handle)
-      };
-      byHandle.set(key, { ...existing, status: result.status });
+      const existing = byHandle.get(key) || {handle:result.handle,displayName:result.handle};
+      byHandle.set(key, {...existing,status:result.status});
     }
     accounts = [...byHandle.values()];
     await saveAccounts();
@@ -128,7 +109,6 @@ $("autoFollow").addEventListener("click", async () => {
     button.disabled = false;
   }
 });
-
 $("search").addEventListener("input", render);
 $("clearList").addEventListener("click", async () => {
   if (!confirm("Clear the locally saved account list?")) return;
@@ -136,5 +116,4 @@ $("clearList").addEventListener("click", async () => {
   await saveAccounts();
   $("status").textContent = "The saved list was cleared.";
 });
-
 loadAccounts();

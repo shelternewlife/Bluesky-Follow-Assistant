@@ -21,7 +21,6 @@
       element.innerText,
       element.textContent
     ].filter(Boolean).join(" ")).toLowerCase().replace(/[^a-z]/g, "");
-
     if (label.includes("following") || label.includes("unfollow")) return "followed";
     if (label.includes("requested") || label.includes("pending")) return "requested";
     if (label.includes("follow")) return "follow";
@@ -47,7 +46,8 @@
     const card = profileCard(anchor);
     const controls = [...card.querySelectorAll(controlsSelector)];
     const control = controls.find(item => actionState(item) === "follow");
-    return { anchor, card, control };
+    const state = controls.map(actionState).find(value => value === "followed" || value === "requested") || "";
+    return { anchor, card, control, state };
   }
 
   function collectVisibleAccounts() {
@@ -61,13 +61,17 @@
       const displayName = lines.find(line =>
         line !== handle && !ignored.test(line) && !/^@?\S+\.bsky\.social$/i.test(line)
       ) || handle;
+      const controls = [...card.querySelectorAll(controlsSelector)];
+      const existingState = controls.map(actionState).find(value =>
+        value === "followed" || value === "requested"
+      );
       if (!found.has(handle.toLowerCase())) {
         found.set(handle.toLowerCase(), {
           handle,
           displayName: displayName.slice(0, 100),
           avatar: card.querySelector("img[src]")?.src || "",
           url: "https://bsky.app/profile/" + encodeURIComponent(handle),
-          status: "new"
+          status: existingState || "new"
         });
       }
     }
@@ -88,15 +92,9 @@
       while (Date.now() < deadline) {
         await wait(400);
         const updated = findAccount(account.handle);
-        const controls = updated?.card
-          ? [...updated.card.querySelectorAll(controlsSelector)]
-          : [];
-        state = controls.map(actionState).find(value =>
-          value === "followed" || value === "requested"
-        ) || "";
+        state = updated?.state || "";
         if (state) break;
       }
-
       attempted.push({
         handle: account.handle,
         status: state === "followed" ? "followed" :
@@ -105,7 +103,6 @@
       if (!state) break;
       await wait(350);
     }
-
     return {
       ok: true,
       limit: 5,
