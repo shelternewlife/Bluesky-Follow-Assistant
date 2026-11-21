@@ -12,16 +12,19 @@ async function saveAccounts() {
 }
 function render() {
   const query = $("search").value.trim().toLowerCase();
-  const visible = accounts.filter(account =>
-    (account.handle || "").toLowerCase().includes(query) ||
-    (account.displayName || "").toLowerCase().includes(query)
+  const visible = accounts.filter(
+    a =>
+      (a.handle || "").toLowerCase().includes(query) ||
+      (a.displayName || "").toLowerCase().includes(query)
   );
   $("count").textContent = String(accounts.length);
   $("accounts").replaceChildren();
   if (!visible.length) {
     const empty = document.createElement("div");
     empty.className = "empty";
-    empty.textContent = accounts.length ? "No matching accounts." : "No accounts collected yet.";
+    empty.textContent = accounts.length
+      ? "No matching accounts."
+      : "No accounts collected yet.";
     $("accounts").append(empty);
   }
   for (const account of visible) {
@@ -31,7 +34,9 @@ function render() {
     avatar.className = "avatar";
     avatar.alt = "";
     avatar.src = account.avatar || "";
-    avatar.onerror = () => { avatar.style.visibility = "hidden"; };
+    avatar.onerror = () => {
+      avatar.style.visibility = "hidden";
+    };
     const details = document.createElement("div");
     details.className = "details";
     const name = document.createElement("div");
@@ -42,97 +47,167 @@ function render() {
     handle.textContent = "@" + account.handle;
     details.append(name, handle);
     const status = document.createElement("span");
-    const state = ["followed", "requested", "unconfirmed"].includes(account.status) ? account.status : "new";
+    const state = ["followed", "requested", "unconfirmed"].includes(
+      account.status
+    )
+      ? account.status
+      : "new";
     status.className = "dot " + state;
-    status.title = ({followed:"Follow confirmed",requested:"Follow request sent",unconfirmed:"Follow not confirmed",new:"Not followed yet"})[state];
+    status.title = {
+      followed: "Follow confirmed",
+      requested: "Follow request sent",
+      unconfirmed: "Follow not confirmed",
+      new: "Not followed yet"
+    }[state];
     status.setAttribute("aria-label", status.title);
     row.append(avatar, details, status);
     $("accounts").append(row);
   }
 }
+
 async function activeBlueskyTab() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   if (!tab?.id || !tab.url?.startsWith("https://bsky.app/")) {
-    $("status").textContent = "Open the Bluesky page containing the accounts first.";
+    $("status").textContent =
+      "Open a Bluesky followers or following page first.";
     return null;
   }
   return tab;
 }
+
 $("collect").addEventListener("click", async () => {
-  $("status").textContent = "Collecting visible accounts…";
+  $("status").textContent = "Collecting accounts…";
   try {
     const tab = await activeBlueskyTab();
     if (!tab) return;
-    const response = await chrome.tabs.sendMessage(tab.id, {type:"BFA_COLLECT_VISIBLE"});
-    if (!response?.ok) throw new Error(response?.error || "Collection failed");
+
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: "BFA_COLLECT_VISIBLE"
+    });
+
+    if (!response?.ok) {
+      throw new Error(response?.error || "Collection failed");
+    }
+
     const diagnostics = response.diagnostics || {};
-    const byHandle = new Map(accounts.map(account => [account.handle.toLowerCase(), account]));
-    for (const account of response.accounts) {
-      const previous = byHandle.get(account.handle.toLowerCase());
-      byHandle.set(account.handle.toLowerCase(), {
-        ...previous, ...account,
-        status: account.status !== "new" ? account.status : previous?.status || "new"
+    const byHandle = new Map(
+      accounts.map(a => [a.handle.toLowerCase(), a])
+    );
+
+    for (const account of response.accounts || []) {
+      const key = account.handle.toLowerCase();
+      const previous = byHandle.get(key);
+      byHandle.set(key, {
+        ...previous,
+        ...account,
+        status:
+          account.status !== "new"
+            ? account.status
+            : previous?.status || "new"
       });
     }
     accounts = [...byHandle.values()];
     await saveAccounts();
-    const count = Array.isArray(response.accounts) ? response.accounts.length : 0;
-    const hrefSamples = (diagnostics.profileHrefSamples || []).slice(0, 4).join(" | ");
-    const btnSamples = (diagnostics.buttonLabelSamples || []).slice(0, 3).join(" · ");
-    if (count) {
-      $("status").textContent = "Collected " + count + " visible account(s).";
+
+    const count = (response.accounts || []).length;
+    if (count > 0) {
+      $("status").textContent =
+        "Collected " +
+        count +
+        " account(s)" +
+        (diagnostics.apiUsed ? " (via Bluesky API)" : " (from page)") +
+        ".";
     } else {
       $("status").textContent =
-        "0 accounts extracted. " +
-        "links=" + (diagnostics.profileLinksFound ?? "?") +
-        " · screen=" + (diagnostics.followerScreen ? "followers" : diagnostics.followingScreen ? "following" : "other") +
-        (hrefSamples ? " · hrefs: " + hrefSamples : " · no profile hrefs") +
-        (btnSamples ? " · buttons: " + btnSamples : "") +
-        " · " + (response.page || tab.url || "");
+        "0 accounts. " +
+        "api=" +
+        (diagnostics.apiUsed ? "yes" : "no") +
+        (diagnostics.apiError ? " error:" + diagnostics.apiError : "") +
+        " · linksInDom=" +
+        (diagnostics.profileLinksInDom ?? "?") +
+        " · context=" +
+        (diagnostics.listContext
+          ? diagnostics.listContext.actor +
+            (diagnostics.listContext.isFollowers ? "/followers" : "/follows")
+          : "none") +
+        " · " +
+        (response.page || tab.url);
     }
   } catch (error) {
     const msg = error?.message || String(error);
-    $("status").textContent =
-      "Collection error: " + msg +
-      (msg.includes("Could not establish connection") || msg.includes("Receiving end does not exist")
-        ? " → Reload the Bluesky tab (F5) after loading/updating the extension."
-        : "");
+    let hint = "";
+    if (
+      msg.includes("Could not establish connection") ||
+      msg.includes("Receiving end does not exist")
+    ) {
+      hint =
+        " → Reload the Bluesky tab (F5) after installing/updating the extension.";
+    }
+    $("status").textContent = "Collection error: " + msg + hint;
   }
 });
+
 $("autoFollow").addEventListener("click", async () => {
   const button = $("autoFollow");
   button.disabled = true;
-  $("status").textContent = "Following up to five eligible visible accounts…";
+  $("status").textContent = "Following up to 5 eligible accounts…";
   try {
     const tab = await activeBlueskyTab();
     if (!tab) return;
-    const response = await chrome.tabs.sendMessage(tab.id, {type:"BFA_AUTO_FOLLOW_FIVE"});
-    if (!response?.ok) throw new Error(response?.error || "Follow action failed");
-    const byHandle = new Map(accounts.map(account => [account.handle.toLowerCase(), account]));
-    for (const result of response.results) {
+
+    const response = await chrome.tabs.sendMessage(tab.id, {
+      type: "BFA_AUTO_FOLLOW_FIVE"
+    });
+    if (!response?.ok) {
+      throw new Error(response?.error || "Follow action failed");
+    }
+
+    const byHandle = new Map(
+      accounts.map(a => [a.handle.toLowerCase(), a])
+    );
+    for (const result of response.results || []) {
       const key = result.handle.toLowerCase();
-      const existing = byHandle.get(key) || {handle:result.handle,displayName:result.handle};
-      byHandle.set(key, {...existing,status:result.status});
+      const existing = byHandle.get(key) || {
+        handle: result.handle,
+        displayName: result.handle
+      };
+      byHandle.set(key, { ...existing, status: result.status });
     }
     accounts = [...byHandle.values()];
     await saveAccounts();
+
     const followed = response.followed || 0;
-    const requested = response.results.filter(item => item.status === "requested").length;
-    const uncertain = response.results.filter(item => item.status === "unconfirmed").length;
-    $("status").textContent = followed + " follow(s) confirmed" +
+    const requested = (response.results || []).filter(
+      r => r.status === "requested"
+    ).length;
+    const uncertain = (response.results || []).filter(
+      r => r.status === "unconfirmed"
+    ).length;
+
+    $("status").textContent =
+      followed +
+      " follow(s) confirmed" +
       (requested ? " · " + requested + " request(s) sent" : "") +
-      (uncertain ? " · stopped because one result could not be confirmed" : "") + ".";
-  } catch {
-    $("status").textContent = "Automatic follow did not run. Refresh Bluesky and try again.";
+      (uncertain
+        ? " · stopped (one result could not be confirmed)"
+        : "") +
+      ".";
+  } catch (error) {
+    $("status").textContent =
+      "Automatic follow failed. Reload the Bluesky page and try again. (" +
+      (error?.message || error) +
+      ")";
   } finally {
     button.disabled = false;
   }
 });
+
 $("search").addEventListener("input", render);
 $("clearList").addEventListener("click", async () => {
   if (!confirm("Clear the locally saved account list?")) return;
   accounts = [];
   await saveAccounts();
-  $("status").textContent = "The saved list was cleared.";
+  $("status").textContent = "List cleared.";
 });
+
 loadAccounts();
