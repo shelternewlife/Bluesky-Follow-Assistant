@@ -1,29 +1,28 @@
-# Bluesky Follow Assistant
+# Bluesky Follow Assistant (v3.0.0)
 
-Chrome Manifest V3 extension that collects visible Bluesky profile cards and can follow up to five eligible accounts per button-initiated run.
+Chrome extension (Manifest V3) that collects accounts from a Bluesky followers or following page and can automatically follow up to 5 of them per run.
 
-## Use
+## How it works
 
-1. Open `chrome://extensions`.
-2. Enable Developer mode.
-3. Click **Reload** for this extension (or remove the old unpacked copy and load the updated repository folder).
-4. Refresh the Bluesky page containing the profile list.
-5. Open the extension popup.
-6. Click **Collect visible accounts** to display the visible profiles.
-7. Click **Start automatic follow (up to 5)** to follow eligible profiles in the current page DOM.
+1. Open a page like `https://bsky.app/profile/SOMEONE/followers` (or `/follows`).
+2. Click the extension icon → **Collect accounts**.
+3. The extension reads the actor from the URL and fetches the list from Bluesky's public API (`public.api.bsky.app`). This is reliable and does not depend on fragile CSS selectors.
+4. Follow status of currently visible buttons is also read from the page (supports French and English).
+5. Click **Start automatic follow (up to 5)** to click the Follow / S’abonner buttons of up to 5 accounts that are not yet followed. No new tabs are opened.
 
-The popup does not open profile tabs and has no manual per-profile follow controls. A green dot means the page changed to a recognized Following/Unfollow state. Amber means Bluesky displayed a pending follow request. Red means the extension could not confirm the action. Gray means no follow was confirmed for that account.
+## Install
 
-## Limits and behavior
+1. Open `chrome://extensions`
+2. Enable Developer mode
+3. **Remove any old version** of this extension
+4. Load unpacked → select this folder
+5. Open a Bluesky followers page and **reload the page (F5)**
+6. Open the popup and click **Collect accounts**
 
-- At most five follow clicks per run.
-- Only visible profile cards with an enabled Follow control are eligible.
-- Existing follows and pending requests are skipped.
-- If a click cannot be confirmed within ten seconds, the run stops.
-- The action starts only when the user presses the automatic-follow button.
-- Scroll the Bluesky list to load more accounts, then collect or run again.
-- The extension does not bypass challenges or platform controls.
+## Limits
 
-## Privacy and permissions
-
-Collected account details are stored in `chrome.storage.local` on this browser. The extension requests `storage` and `tabs` permissions and access to `https://bsky.app/*`. It does not request Bluesky credentials or send the collected list to a server.
+- Maximum 5 automatic follows per button press
+- Only works on the currently open Bluesky tab
+- Does not open profile pages or new tabs
+- Collection uses the public API (no login required for the list)
+- Auto-follow clicks the real buttons on the page (requires you to be logged in)
