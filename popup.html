@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Bluesky Follow Assistant</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <div class="brand-mark">🦋</div>
+    <div>
+      <h1>Bluesky Follow Assistant</h1>
+      <p>Collect · Review · Decide</p>
+    </div>
+  </header>
+
+  <section class="toolbar">
+    <button id="collect" class="primary">Collect visible accounts</button>
+    <div class="hint">Open a Bluesky followers page, then scroll and collect each visible section. Repeated accounts are skipped.</div>
+    <div id="status" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="summary">
+    <strong id="count">0</strong>
+    <span>saved accounts on this browser</span>
+  </section>
+
+  <section class="controls">
+    <input id="search" type="search" placeholder="Search saved accounts…" aria-label="Search saved accounts">
+    <div class="actions">
+      <button id="selectVisible" class="secondary">Select visible</button>
+      <button id="clearSelection" class="secondary">Clear selection</button>
+    </div>
+  </section>
+
+  <main id="accounts" aria-live="polite">
+    <div class="empty">No accounts collected yet.</div>
+  </main>
+
+  <footer>
+    <button id="openSelected" class="primary" disabled>Open selected profiles</button>
+    <button id="deleteSelected" class="danger" disabled>Remove selected</button>
+    <p>Profiles open in tabs. You decide whether to follow each account manually. Data stays in Chrome storage on this browser.</p>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
