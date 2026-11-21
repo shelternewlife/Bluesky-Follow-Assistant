@@ -253,7 +253,7 @@ function pageAutoFollow(handles) {
   return (async () => {
     const results = [];
     for (const handle of handles) {
-      if (results.length >= 5) break;
+      if (results.length >= 50) break;
       const btn = findFollowButton(handle);
       if (!btn) continue;
 
@@ -328,14 +328,14 @@ $("btnCollect").addEventListener("click", async () => {
 $("btnFollow").addEventListener("click", async () => {
   const btn = $("btnFollow");
   btn.disabled = true;
-  setStatus("Following up to 5…");
+  setStatus("Following up to 50…");
   try {
     const tab = await getBlueskyTab();
     if (!tab) return;
 
     const candidates = accounts
       .filter(a => a.status === "new")
-      .slice(0, 5)
+      .slice(0, 50)
       .map(a => a.handle);
 
     if (!candidates.length) {
