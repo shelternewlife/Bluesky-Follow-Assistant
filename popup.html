@@ -9,41 +9,26 @@
 <body>
   <header>
     <div class="brand-mark">🦋</div>
-    <div>
-      <h1>Bluesky Follow Assistant</h1>
-      <p>Collect · Review · Decide</p>
-    </div>
+    <div><h1>Bluesky Follow Assistant</h1><p>Automatic follow · maximum 5 per run</p></div>
   </header>
-
   <section class="toolbar">
-    <button id="collect" class="primary">Collect visible accounts</button>
-    <div class="hint">Open a Bluesky followers page, then scroll and collect each visible section. Repeated accounts are skipped.</div>
-    <div id="status" role="status" aria-live="polite"></div>
+    <button id="collect" class="secondary">Collect visible accounts</button>
+    <button id="autoFollow" class="primary">Start automatic follow (up to 5)</button>
+    <p class="hint">The extension checks profiles visible on the open Bluesky page. It does not open profile tabs.</p>
+    <div id="status" role="status" aria-live="polite">Ready.</div>
   </section>
-
-  <section class="summary">
-    <strong id="count">0</strong>
-    <span>saved accounts on this browser</span>
-  </section>
-
+  <section class="summary"><strong id="count">0</strong><span>accounts in the list</span></section>
   <section class="controls">
-    <input id="search" type="search" placeholder="Search saved accounts…" aria-label="Search saved accounts">
-    <div class="actions">
-      <button id="selectVisible" class="secondary">Select visible</button>
-      <button id="clearSelection" class="secondary">Clear selection</button>
-    </div>
+    <input id="search" type="search" placeholder="Search accounts…" aria-label="Search accounts">
+    <button id="clearList" class="text-button">Clear list</button>
   </section>
-
-  <main id="accounts" aria-live="polite">
-    <div class="empty">No accounts collected yet.</div>
-  </main>
-
+  <main id="accounts" aria-live="polite"><div class="empty">No accounts collected yet.</div></main>
   <footer>
-    <button id="openSelected" class="primary" disabled>Open selected profiles</button>
-    <button id="deleteSelected" class="danger" disabled>Remove selected</button>
-    <p>Profiles open in tabs. You decide whether to follow each account manually. Data stays in Chrome storage on this browser.</p>
+    <span class="legend"><i class="dot followed"></i> Followed</span>
+    <span class="legend"><i class="dot requested"></i> Request sent</span>
+    <span class="legend"><i class="dot new"></i> Not followed yet</span>
+    <span class="legend"><i class="dot failed"></i> Not confirmed</span>
   </footer>
-
   <script src="popup.js"></script>
 </body>
 </html>

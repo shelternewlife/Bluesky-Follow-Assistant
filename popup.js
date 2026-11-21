@@ -1,6 +1,5 @@
-const $ = (id) => document.getElementById(id);
+const $ = id => document.getElementById(id);
 let accounts = [];
-const selected = new Set();
 
 async function loadAccounts() {
   const stored = await chrome.storage.local.get({ accounts: [] });
@@ -16,9 +15,8 @@ async function saveAccounts() {
 function render() {
   const query = $("search").value.trim().toLowerCase();
   const visible = accounts.filter(account =>
-    account.handle.toLowerCase().includes(query) ||
-    (account.displayName || "").toLowerCase().includes(query) ||
-    (account.description || "").toLowerCase().includes(query)
+    (account.handle || "").toLowerCase().includes(query) ||
+    (account.displayName || "").toLowerCase().includes(query)
   );
   $("count").textContent = String(accounts.length);
   $("accounts").replaceChildren();
@@ -33,16 +31,6 @@ function render() {
   for (const account of visible) {
     const row = document.createElement("div");
     row.className = "account";
-
-    const checkbox = document.createElement("input");
-    checkbox.type = "checkbox";
-    checkbox.checked = selected.has(account.handle);
-    checkbox.setAttribute("aria-label", `Select ${account.handle}`);
-    checkbox.addEventListener("change", () => {
-      checkbox.checked ? selected.add(account.handle) : selected.delete(account.handle);
-      updateButtons();
-    });
-
     const avatar = document.createElement("img");
     avatar.className = "avatar";
     avatar.alt = "";
@@ -59,66 +47,94 @@ function render() {
     handle.textContent = "@" + account.handle;
     details.append(name, handle);
 
-    const open = document.createElement("button");
-    open.className = "open-one";
-    open.textContent = "Open";
-    open.addEventListener("click", () => chrome.tabs.create({ url: account.url }));
-
-    row.append(checkbox, avatar, details, open);
+    const status = document.createElement("span");
+    const state = ["followed", "requested", "unconfirmed"].includes(account.status) ? account.status : "new";
+    status.className = "dot " + state;
+    status.title = ({
+      followed: "Follow confirmed",
+      requested: "Follow request sent",
+      unconfirmed: "Follow not confirmed",
+      new: "Not followed yet"
+    })[state];
+    status.setAttribute("aria-label", status.title);
+    row.append(avatar, details, status);
     $("accounts").append(row);
   }
-  updateButtons();
 }
 
-function updateButtons() {
-  const hasSelection = selected.size > 0;
-  $("openSelected").disabled = !hasSelection;
-  $("deleteSelected").disabled = !hasSelection;
+async function activeBlueskyTab() {
+  const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (!tab?.id || !tab.url?.startsWith("https://bsky.app/")) {
+    $("status").textContent = "Open the Bluesky page containing the accounts first.";
+    return null;
+  }
+  return tab;
 }
 
 $("collect").addEventListener("click", async () => {
-  $("status").textContent = "Reading visible profile cards…";
+  $("status").textContent = "Collecting visible accounts…";
   try {
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-    if (!tab?.id || !tab.url?.startsWith("https://bsky.app/")) {
-      $("status").textContent = "Open a Bluesky followers page first.";
-      return;
-    }
+    const tab = await activeBlueskyTab();
+    if (!tab) return;
     const response = await chrome.tabs.sendMessage(tab.id, { type: "BFA_COLLECT_VISIBLE" });
-    if (!response?.ok) throw new Error("The page did not return account data.");
-    const known = new Set(accounts.map(account => account.handle.toLowerCase()));
-    const fresh = response.accounts.filter(account => !known.has(account.handle.toLowerCase()));
-    accounts = [...accounts, ...fresh];
+    if (!response?.ok) throw new Error("Collection failed");
+    const byHandle = new Map(accounts.map(account => [account.handle.toLowerCase(), account]));
+    for (const account of response.accounts) {
+      const previous = byHandle.get(account.handle.toLowerCase());
+      byHandle.set(account.handle.toLowerCase(), {
+        ...previous,
+        ...account,
+        status: previous?.status || account.status || "new"
+      });
+    }
+    accounts = [...byHandle.values()];
     await saveAccounts();
-    $("status").textContent = fresh.length
-      ? `Added ${fresh.length} new account(s). ${response.accounts.length - fresh.length} duplicate(s) skipped.`
-      : `No new accounts found in this visible section (${response.accounts.length} detected).`;
-  } catch (error) {
-    $("status").textContent = "Could not read this page. Refresh Bluesky and try again.";
+    $("status").textContent = "Collected " + response.accounts.length + " visible account(s).";
+  } catch {
+    $("status").textContent = "Could not collect accounts. Refresh the Bluesky page and try again.";
+  }
+});
+
+$("autoFollow").addEventListener("click", async () => {
+  const button = $("autoFollow");
+  button.disabled = true;
+  $("status").textContent = "Following up to five eligible visible accounts…";
+  try {
+    const tab = await activeBlueskyTab();
+    if (!tab) return;
+    const response = await chrome.tabs.sendMessage(tab.id, { type: "BFA_AUTO_FOLLOW_FIVE" });
+    if (!response?.ok) throw new Error("Follow action failed");
+    const byHandle = new Map(accounts.map(account => [account.handle.toLowerCase(), account]));
+    for (const result of response.results) {
+      const key = result.handle.toLowerCase();
+      const existing = byHandle.get(key) || {
+        handle: result.handle,
+        displayName: result.handle,
+        url: "https://bsky.app/profile/" + encodeURIComponent(result.handle)
+      };
+      byHandle.set(key, { ...existing, status: result.status });
+    }
+    accounts = [...byHandle.values()];
+    await saveAccounts();
+    const followed = response.followed || 0;
+    const requested = response.results.filter(item => item.status === "requested").length;
+    const uncertain = response.results.filter(item => item.status === "unconfirmed").length;
+    $("status").textContent = followed + " follow(s) confirmed" +
+      (requested ? " · " + requested + " request(s) sent" : "") +
+      (uncertain ? " · stopped because one result could not be confirmed" : "") + ".";
+  } catch {
+    $("status").textContent = "Automatic follow did not run. Refresh Bluesky and try again.";
+  } finally {
+    button.disabled = false;
   }
 });
 
 $("search").addEventListener("input", render);
-$("selectVisible").addEventListener("click", () => {
-  const query = $("search").value.trim().toLowerCase();
-  accounts.filter(account =>
-    account.handle.toLowerCase().includes(query) ||
-    (account.displayName || "").toLowerCase().includes(query) ||
-    (account.description || "").toLowerCase().includes(query)
-  ).forEach(account => selected.add(account.handle));
-  render();
-});
-$("clearSelection").addEventListener("click", () => { selected.clear(); render(); });
-$("openSelected").addEventListener("click", async () => {
-  const chosen = accounts.filter(account => selected.has(account.handle));
-  for (const account of chosen) await chrome.tabs.create({ url: account.url, active: false });
-  $("status").textContent = `Opened ${chosen.length} profile tab(s). Review and follow manually.`;
-});
-$("deleteSelected").addEventListener("click", async () => {
-  accounts = accounts.filter(account => !selected.has(account.handle));
-  selected.clear();
+$("clearList").addEventListener("click", async () => {
+  if (!confirm("Clear the locally saved account list?")) return;
+  accounts = [];
   await saveAccounts();
-  $("status").textContent = "Selected accounts removed from local storage.";
+  $("status").textContent = "The saved list was cleared.";
 });
 
 loadAccounts();

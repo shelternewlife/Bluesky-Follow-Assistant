@@ -1,19 +1,12 @@
 {
   "manifest_version": 3,
   "name": "Bluesky Follow Assistant",
-  "version": "1.0.0",
-  "description": "Collect and review visible Bluesky follower accounts locally before opening profiles for manual follow decisions.",
-  "permissions": ["storage"],
+  "version": "1.2.0",
+  "description": "Collect visible Bluesky accounts and show follow status for up to five automatic follows per run.",
+  "permissions": ["storage", "tabs"],
   "host_permissions": ["https://bsky.app/*"],
-  "action": {
-    "default_title": "Bluesky Follow Assistant",
-    "default_popup": "popup.html"
-  },
+  "action": { "default_title": "Bluesky Follow Assistant", "default_popup": "popup.html" },
   "content_scripts": [
-    {
-      "matches": ["https://bsky.app/*"],
-      "js": ["content.js"],
-      "run_at": "document_idle"
-    }
+    { "matches": ["https://bsky.app/*"], "js": ["content.js"], "run_at": "document_idle" }
   ]
 }

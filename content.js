@@ -2,120 +2,120 @@
   if (window.__blueskyFollowAssistantLoaded) return;
   window.__blueskyFollowAssistantLoaded = true;
 
-  const clean = value => (value || "").replace(/\s+/g, " ").trim();
-  const isProfilePath = url => {
-    try {
-      const parsed = new URL(url, location.origin);
-      return parsed.origin === location.origin && /^\/profile\/[^/]+\/?$/.test(parsed.pathname);
-    } catch {
-      return false;
-    }
-  };
+  const clean = value => (value || "").replace(/\\s+/g, " ").trim();
   const wait = ms => new Promise(resolve => setTimeout(resolve, ms));
-  const buttonLabel = button => clean(button?.innerText || button?.getAttribute("aria-label") || button?.textContent).toLowerCase();
+  const isProfilePath = href => {
+    try {
+      const url = new URL(href, location.origin);
+      return url.origin === location.origin && /^\\/profile\\/[^/]+\\/?$/.test(url.pathname);
+    } catch { return false; }
+  };
 
-  function findCard(anchor) {
+  function handleFromAnchor(anchor) {
+    try {
+      return decodeURIComponent(new URL(anchor.href, location.origin).pathname.split("/")[2] || "").replace(/^@/, "");
+    } catch { return ""; }
+  }
+
+  function actionLabel(element) {
+    return clean(
+      element.getAttribute("aria-label") ||
+      element.getAttribute("title") ||
+      element.getAttribute("data-testid") ||
+      element.innerText ||
+      element.textContent
+    ).toLowerCase().replace(/[^a-z]/g, "");
+  }
+
+  function actionState(element) {
+    const label = actionLabel(element);
+    if (label === "follow" || label === "followbtn") return "follow";
+    if (label === "following" || label === "unfollow" || label === "followingbtn") return "followed";
+    if (label === "requested" || label === "requesteds" || label === "pending") return "requested";
+    return "";
+  }
+
+  function profileCard(anchor) {
     let node = anchor;
-    for (let level = 0; level < 9 && node.parentElement; level++) {
+    for (let depth = 0; depth < 12 && node?.parentElement; depth++) {
       node = node.parentElement;
       const text = clean(node.innerText);
-      const buttons = [...node.querySelectorAll("button")];
-      if (buttons.length && text.length > 0 && text.length < 1800) return node;
+      if (!text || text.length > 2200) continue;
+      const controls = [...node.querySelectorAll('button,[role="button"]')];
+      if (controls.some(control => actionState(control))) return node;
     }
     return anchor.parentElement || anchor;
   }
 
+  function findAccount(handle) {
+    const anchor = [...document.querySelectorAll('a[href*="/profile/"]')]
+      .find(item => handleFromAnchor(item).toLowerCase() === handle.toLowerCase());
+    if (!anchor) return null;
+    const card = profileCard(anchor);
+    const controls = [...card.querySelectorAll('button,[role="button"]')];
+    const control = controls.find(item => actionState(item) === "follow");
+    return { anchor, card, control };
+  }
+
   function collectVisibleAccounts() {
     const found = new Map();
-    const anchors = [...document.querySelectorAll('a[href*="/profile/"]')];
-    for (const anchor of anchors) {
+    for (const anchor of document.querySelectorAll('a[href*="/profile/"]')) {
       const href = anchor.getAttribute("href");
       if (!href || !isProfilePath(href)) continue;
-      const url = new URL(href, location.origin);
-      let handle;
-      try { handle = decodeURIComponent(url.pathname.split("/")[2] || "").replace(/^@/, ""); }
-      catch { continue; }
-      if (!handle || handle.includes("?") || handle.includes("#")) continue;
-
-      const card = findCard(anchor);
-      const lines = (card.innerText || "").split(/\n+/).map(clean).filter(Boolean);
-      const displayName = lines.find(line =>
-        line !== handle &&
-        !/^(@?\S+\.bsky\.social)$/i.test(line) &&
-        !/^(follow|following|requested|unfollow|s'abonner|abonné|abonner|suivi)$/i.test(line)
-      ) || handle;
-      const avatar = card.querySelector("img[src]")?.src || "";
-      const description = lines
-        .filter(line => line !== displayName && line !== handle &&
-          !/^(follow|following|requested|unfollow|s'abonner|abonné|abonner|suivi)$/i.test(line))
-        .slice(0, 2).join(" · ");
-
+      const handle = handleFromAnchor(anchor);
+      if (!handle) continue;
+      const card = profileCard(anchor);
+      const lines = (card.innerText || "").split(/\\n+/).map(clean).filter(Boolean);
+      const ignored = /^(follow|following|requested|unfollow|s'abonner|abonné|abonner|suivi)$/i;
+      const displayName = lines.find(line => line !== handle && !ignored.test(line) && !/^@?\\S+\\.bsky\\.social$/i.test(line)) || handle;
       if (!found.has(handle.toLowerCase())) {
         found.set(handle.toLowerCase(), {
           handle,
           displayName: displayName.slice(0, 100),
-          description: description.slice(0, 240),
-          avatar,
-          url: "https://bsky.app/profile/" + encodeURIComponent(handle)
+          avatar: card.querySelector("img[src]")?.src || "",
+          url: "https://bsky.app/profile/" + encodeURIComponent(handle),
+          status: "new"
         });
       }
     }
     return [...found.values()];
   }
 
-  function findFollowButton(card) {
-    return [...card.querySelectorAll("button")].find(button =>
-      !button.disabled && buttonLabel(button) === "follow"
-    ) || null;
-  }
+  async function autoFollowFive() {
+    const candidates = collectVisibleAccounts();
+    const attempted = [];
+    for (const account of candidates) {
+      if (attempted.length >= 5) break;
+      const match = findAccount(account.handle);
+      if (!match?.control || match.control.disabled) continue;
 
-  async function autoFollowVisible() {
-    const results = [];
-    const seen = new Set();
-    const anchors = [...document.querySelectorAll('a[href*="/profile/"]')];
-
-    for (const anchor of anchors) {
-      if (results.length >= 5) break;
-      const href = anchor.getAttribute("href");
-      if (!href || !isProfilePath(href)) continue;
-
-      const url = new URL(href, location.origin);
-      let handle;
-      try { handle = decodeURIComponent(url.pathname.split("/")[2] || "").replace(/^@/, ""); }
-      catch { continue; }
-      const key = handle.toLowerCase();
-      if (!key || seen.has(key)) continue;
-      seen.add(key);
-
-      const card = findCard(anchor);
-      const followButton = findFollowButton(card);
-      if (!followButton) continue;
-
-      followButton.click();
-      await wait(1600);
-
-      const updatedLabels = [...card.querySelectorAll("button")].map(buttonLabel);
-      const confirmed = updatedLabels.some(label =>
-        label === "following" || label === "requested" || label === "unfollow"
-      );
-
-      if (confirmed) {
-        results.push({ handle, status: "followed" });
-      } else {
-        results.push({ handle, status: "unconfirmed" });
-        break;
+      match.control.click();
+      let state = "";
+      const deadline = Date.now() + 10000;
+      while (Date.now() < deadline) {
+        await wait(400);
+        const updated = findAccount(account.handle);
+        const controls = updated?.card
+          ? [...updated.card.querySelectorAll('button,[role="button"]')]
+          : [];
+        state = controls.map(actionState).find(value => value === "followed" || value === "requested") || "";
+        if (state) break;
       }
-      await wait(500);
+
+      attempted.push({
+        handle: account.handle,
+        status: state === "followed" ? "followed" : state === "requested" ? "requested" : "unconfirmed"
+      });
+      if (!state) break;
+      await wait(350);
     }
 
     return {
       ok: true,
       limit: 5,
-      followed: results.filter(item => item.status === "followed").length,
-      results,
-      message: results.length
-        ? "Processed up to five visible accounts."
-        : "No eligible, not-yet-followed accounts with a visible Follow button were found."
+      attempted: attempted.length,
+      followed: attempted.filter(item => item.status === "followed").length,
+      results: attempted
     };
   }
 
@@ -125,9 +125,9 @@
       return false;
     }
     if (message?.type === "BFA_AUTO_FOLLOW_FIVE") {
-      autoFollowVisible()
-        .then(sendResponse)
-        .catch(() => sendResponse({ ok: false, error: "The follow run could not be completed." }));
+      autoFollowFive().then(sendResponse).catch(() =>
+        sendResponse({ ok: false, error: "The automatic follow run failed." })
+      );
       return true;
     }
     return false;
