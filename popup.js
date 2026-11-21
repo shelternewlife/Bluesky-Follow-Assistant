@@ -131,9 +131,10 @@ function pageCollect() {
             " " +
             (btn.innerText || "")
         );
-        if (/following|unfollow|abonne|suivi/.test(label)) return "followed";
-        if (/requested|pending|demande|en attente/.test(label)) return "requested";
-        if (/follow|s'abonner|sabonner|suivre|abonner/.test(label)) return "follow";
+        // Check "can follow" FIRST — "S'abonner" contains substring "abonne"
+        if (/(^|[^a-z])(s'abonner|sabonner|suivre|follow back|followback|\bfollow\b)([^a-z]|$)/.test(label)) return "follow";
+        if (/(^|[^a-z])(requested|pending|demande|en attente|awaiting)([^a-z]|$)/.test(label)) return "requested";
+        if (/(^|[^a-z])(following|unfollow|\babonne\b|abonnee|\bsuivi\b|suivie)([^a-z]|$)/.test(label)) return "followed";
         return "";
       }
 
@@ -197,9 +198,10 @@ function pageAutoFollow(handles) {
     const label = norm(
       (btn.getAttribute("aria-label") || "") + " " + (btn.innerText || "")
     );
-    if (/following|unfollow|abonne|suivi/.test(label)) return "followed";
-    if (/requested|pending|demande|en attente/.test(label)) return "requested";
-    if (/follow|s'abonner|sabonner|suivre|abonner/.test(label)) return "follow";
+    // Check "can follow" FIRST — "S'abonner" contains substring "abonne"
+    if (/(^|[^a-z])(s'abonner|sabonner|suivre|follow back|followback|\bfollow\b)([^a-z]|$)/.test(label)) return "follow";
+    if (/(^|[^a-z])(requested|pending|demande|en attente|awaiting)([^a-z]|$)/.test(label)) return "requested";
+    if (/(^|[^a-z])(following|unfollow|\babonne\b|abonnee|\bsuivi\b|suivie)([^a-z]|$)/.test(label)) return "followed";
     return "";
   }
 
